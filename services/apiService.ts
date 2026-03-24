@@ -1,42 +1,58 @@
 /**
- * ===================================================================
- * API Service — Google Apps Script Backend
- * ===================================================================
- * Replace your existing services/apiService.ts with this file.
+ * API Service — Google Apps Script Backend (v2)
  * 
- * IMPORTANT: Set your deployed Apps Script URL below.
- * ===================================================================
+ * Uses GET-based approach to avoid Apps Script redirect issues with POST.
  */
 
 import { LeadData } from '../types';
 
-// ┌─────────────────────────────────────────────────────────────────┐
-// │  PASTE YOUR DEPLOYED APPS SCRIPT WEB APP URL HERE              │
-// └─────────────────────────────────────────────────────────────────┘
 const APPS_SCRIPT_URL = 'YOUR_DEPLOYED_APPS_SCRIPT_URL_HERE';
 // Example: 'https://script.google.com/macros/s/AKfycbx.../exec'
 
 
-// ── Login ───────────────────────────────────────────────────────────
+// ── Helper: Call Apps Script reliably ────────────────────────────────
 
-export const login = async (username: string, password: string) => {
-  const response = await fetch(APPS_SCRIPT_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain' }, // Apps Script needs text/plain to avoid CORS preflight
-    body: JSON.stringify({
-      action: 'login',
-      username,
-      password
-    })
+async function callAppsScript(params: Record<string, string>): Promise<any> {
+  // Encode all params as URL query string (avoids POST redirect issues)
+  const url = new URL(APPS_SCRIPT_URL);
+  Object.entries(params).forEach(([key, value]) => {
+    url.searchParams.set(key, value);
   });
 
-  const result = await response.json();
+  const response = await fetch(url.toString(), {
+    method: 'GET',
+    redirect: 'follow'
+  });
+
+  const text = await response.text();
+
+  if (!text || text.trim().length === 0) {
+    throw new Error('Empty response from server');
+  }
+
+  let result;
+  try {
+    result = JSON.parse(text);
+  } catch {
+    throw new Error('Invalid response from server');
+  }
 
   if (result.error) {
     throw new Error(result.error);
   }
 
-  return result.data; // { token, roleType, id }
+  return result.data;
+}
+
+
+// ── Login ───────────────────────────────────────────────────────────
+
+export const login = async (username: string, password: string) => {
+  return await callAppsScript({
+    action: 'login',
+    username,
+    password
+  });
 };
 
 
@@ -44,18 +60,12 @@ export const login = async (username: string, password: string) => {
 
 export const fetchLeadsFromAPI = async (): Promise<LeadData[]> => {
   try {
-    const token = localStorage.getItem('token');
-    const url = `${APPS_SCRIPT_URL}?action=leads&token=${encodeURIComponent(token || '')}`;
-    
-    const response = await fetch(url);
-    const result = await response.json();
-
-    if (result.error) {
-      console.error('Fetch leads error:', result.error);
-      return [];
-    }
-
-    return result.data || [];
+    const token = localStorage.getItem('token') || '';
+    const data = await callAppsScript({
+      action: 'leads',
+      token
+    });
+    return data || [];
   } catch (error) {
     console.error('Could not fetch leads from API:', error);
     return [];
@@ -63,31 +73,9 @@ export const fetchLeadsFromAPI = async (): Promise<LeadData[]> => {
 };
 
 
-// ── Import Leads ────────────────────────────────────────────────────
+// ── Import (no-op — data managed in Google Sheets) ──────────────────
 
-export const importLeadsToAPI = async (data: LeadData[]): Promise<boolean> => {
-  try {
-    const token = localStorage.getItem('token');
-
-    const response = await fetch(APPS_SCRIPT_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({
-        action: 'import',
-        token,
-        data
-      })
-    });
-
-    const result = await response.json();
-
-    if (result.error) {
-      throw new Error(result.error);
-    }
-
-    return true;
-  } catch (error) {
-    console.error('Could not import leads to API:', error);
-    throw error;
-  }
+export const importLeadsToAPI = async (_data: LeadData[]): Promise<boolean> => {
+  console.warn('Import disabled — data is managed directly in Google Sheets.');
+  return true;
 };
