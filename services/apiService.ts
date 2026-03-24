@@ -6,7 +6,7 @@
 
 import { LeadData } from '../types';
 
-const APPS_SCRIPT_URL = 'YOUR_DEPLOYED_APPS_SCRIPT_URL_HERE';
+const APPS_SCRIPT_URL = 'https://script.google.com/a/macros/joinditto.in/s/AKfycbyJHaC8TFlrLeZUvXbXuwhxYnleifmP31Urdezs73sEjPkGg7MJgGOyUFASEgvW_h8I5Q/exec';
 // Example: 'https://script.google.com/macros/s/AKfycbx.../exec'
 
 
